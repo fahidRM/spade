@@ -32,7 +32,9 @@ class TraceStore(object):
           category (str, optional): a category to classify the event (Default value = None)
 
         """
+        #print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
         date = datetime.datetime.now()
+        #print(event)
         self.store.insert(0, (date, event, category))
         if len(self.store) > self.size:
             del self.store[-1]

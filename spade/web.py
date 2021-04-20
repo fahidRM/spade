@@ -73,6 +73,7 @@ class WebApp(object):
             self._set_loaders()
         self.setup_routes()
         self.runner = aioweb.AppRunner(self.app)
+        print("cvcvcv")
         return self.agent.submit(
             start_server_in_loop(self.runner, self.hostname, self.port, self.agent)
         )

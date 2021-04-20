@@ -26,6 +26,16 @@ class AuthenticationFailure(Exception):
 
 
 class Agent(object):
+
+
+    """
+     Fahid's notes...
+        -  could abstract out xmpp from this class.
+           have a communications class or equivalent
+        - pass dictionary for messaging platform connection info (xmpp info, http info, rabbit mq..)
+
+
+    """
     def __init__(self, jid, password, verify_security=False):
         """
         Creates an agent

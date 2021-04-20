@@ -3,7 +3,7 @@ import collections
 import logging
 import time
 import traceback
-from abc import ABCMeta, abstractmethod
+from abc import ABCMeta
 from asyncio import CancelledError
 from datetime import timedelta, datetime
 from threading import Event
@@ -11,6 +11,9 @@ from typing import Any, Union
 
 from .message import Message
 from .template import Template
+
+from spade.transparency.TraceableBehaviour import TraceableBehaviour
+
 
 now = datetime.now
 
@@ -35,10 +38,11 @@ class NotValidTransition(Exception):
     pass
 
 
-class CyclicBehaviour(object, metaclass=ABCMeta):
+class CyclicBehaviour(TraceableBehaviour, metaclass=ABCMeta):
     """ This behaviour is executed cyclically until it is stopped. """
 
-    def __init__(self):
+    def __init__(self, name="Default"):
+        super().__init__()
         self.agent = None
         self.template = None
         self._force_kill = Event()
@@ -50,6 +54,10 @@ class CyclicBehaviour(object, metaclass=ABCMeta):
         self.is_running = False
 
         self.queue = None
+
+        # added by Fahid....
+        self.type = "Cyclic Behaviour"
+        self.name = name
 
     def set_agent(self, agent):
         """
@@ -115,7 +123,7 @@ class CyclicBehaviour(object, metaclass=ABCMeta):
         return self.agent.get(name)
 
     def start(self):
-        """starts behaviour in the event loop"""
+        super()._on_start()
         self.agent.submit(self._start())
         self.is_running = True
 
@@ -148,6 +156,7 @@ class CyclicBehaviour(object, metaclass=ABCMeta):
         if exit_code is not None:
             self._exit_code = exit_code
         logger.info("Killing behavior {0} with exit code: {1}".format(self, exit_code))
+        super()._on_end()
 
     def is_killed(self) -> bool:
         """
@@ -226,24 +235,20 @@ class CyclicBehaviour(object, metaclass=ABCMeta):
                 raise TimeoutError
 
     async def on_start(self):
-        """
-        Coroutine called before the behaviour is started.
-        """
-        pass
+        super()._on_start()
+
 
     async def on_end(self):
-        """
-        Coroutine called after the behaviour is done or killed.
-        """
-        pass
+        super()._on_end()
 
-    @abstractmethod
+    #@abstractmethod
     async def run(self):
         """
         Body of the behaviour.
         To be implemented by user.
         """
-        raise NotImplementedError  # pragma: no cover
+        super()._on_run()
+        #raise NotImplementedError  # pragma: no cover
 
     async def _run(self):
         """
@@ -354,9 +359,12 @@ class CyclicBehaviour(object, metaclass=ABCMeta):
 class OneShotBehaviour(CyclicBehaviour, metaclass=ABCMeta):
     """This behaviour is only executed once"""
 
-    def __init__(self):
+    def __init__(self, name="Default"):
         super().__init__()
         self._already_executed = False
+        # added by Fahid....
+        self.type = "OneShot Behaviour"
+        self.name = name
 
     def _done(self) -> bool:
         """ """
@@ -369,7 +377,7 @@ class OneShotBehaviour(CyclicBehaviour, metaclass=ABCMeta):
 class PeriodicBehaviour(CyclicBehaviour, metaclass=ABCMeta):
     """This behaviour is executed periodically with an interval"""
 
-    def __init__(self, period, start_at=None):
+    def __init__(self, period, start_at=None, name="Default"):
         """
         Creates a periodic behaviour.
 
@@ -380,6 +388,11 @@ class PeriodicBehaviour(CyclicBehaviour, metaclass=ABCMeta):
         super().__init__()
         self._period = None
         self.period = period
+
+        # added by Fahid....
+        self.type = "Periodic Behaviour"
+        self.name = name
+        # end addition
 
         if start_at:
             self._next_activation = start_at
@@ -424,7 +437,7 @@ class PeriodicBehaviour(CyclicBehaviour, metaclass=ABCMeta):
 class TimeoutBehaviour(OneShotBehaviour, metaclass=ABCMeta):
     """This behaviour is executed once at after specified datetime"""
 
-    def __init__(self, start_at):
+    def __init__(self, start_at, name="Default"):
         """
         Creates a timeout behaviour, which is run at start_at
 
@@ -435,6 +448,11 @@ class TimeoutBehaviour(OneShotBehaviour, metaclass=ABCMeta):
 
         self._timeout = start_at
         self._timeout_triggered = False
+
+        # added by Fahid....
+        self.type = "Timeout Behaviour"
+        self.name = name
+
 
     async def _run(self):
         if now() >= self._timeout:
@@ -459,9 +477,13 @@ class TimeoutBehaviour(OneShotBehaviour, metaclass=ABCMeta):
 class State(OneShotBehaviour, metaclass=ABCMeta):
     """A state of a FSMBehaviour is a OneShotBehaviour"""
 
-    def __init__(self):
+    def __init__(self, name="State"):
         super().__init__()
         self.next_state = None
+
+        # added by Fahid....
+        self.type = "State"
+        self.name = name
 
     def set_next_state(self, state_name):
         """
@@ -479,12 +501,16 @@ class State(OneShotBehaviour, metaclass=ABCMeta):
 class FSMBehaviour(CyclicBehaviour):
     """A behaviour composed of states (oneshotbehaviours) that may transition from one state to another."""
 
-    def __init__(self):
+    def __init__(self, name="Default"):
         super().__init__()
         self._states = {}
         self._transitions = collections.defaultdict(list)
         self.current_state = None
         self.setup()
+
+        # added by Fahid....
+        self.type = "FSM"
+        self.name = name
 
     def setup(self):
         """ """
@@ -600,6 +626,7 @@ class FSMBehaviour(CyclicBehaviour):
 
         """
         graph = "digraph finite_state_machine { rankdir=LR; node [fixedsize=true];"
+        print(self._transitions.items())
         for origin, dest in self._transitions.items():
             origin = origin.replace(" ", "_")
             for d in dest:
